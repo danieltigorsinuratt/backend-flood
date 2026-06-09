@@ -17,18 +17,23 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->statefulApi();
-
-        $middleware->redirectGuestsTo(function (Request $request) {
-            if ($request->is('api/*') || $request->expectsJson()) {
-                return null;
-            }
-        });
-
-        $middleware->alias([
-            'apikey' => ApiKeyMiddleware::class,
-            'role' => RoleMiddleware::class,
-        ]);
+    $middleware->use([
+        HandleCors::class,
+    ]);
+    $middleware->validateCsrfTokens(except: [
+        'api/*',
+        'sanctum/csrf-cookie',
+    ]);
+    $middleware->statefulApi();
+    $middleware->redirectGuestsTo(function (Request $request) {
+        if ($request->is('api/*') || $request->expectsJson()) {
+            return null;
+        }
+    });
+    $middleware->alias([
+        'apikey' => ApiKeyMiddleware::class,
+        'role' => RoleMiddleware::class,
+    ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (AuthenticationException $e, Request $request) {

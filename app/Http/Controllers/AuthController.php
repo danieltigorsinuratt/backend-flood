@@ -12,38 +12,36 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+    public function login(Request $request): JsonResponse
+{
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
+        'remember' => ['sometimes', 'boolean'],
+    ]);
+
+    if (! Auth::attempt(
+        ['email' => $credentials['email'], 'password' => $credentials['password']],
+        $request->boolean('remember'),
+    )) {
+        throw ValidationException::withMessages([
+            'email' => ['Email atau password salah.'],
         ]);
-
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()
-                ->withInput($request->only('email', 'remember'))
-                ->withErrors(['email' => 'Email atau password salah.']);
-        }
-
-        $request->session()->regenerate();
-
-        $user = $request->user();
-        $role = (string) ($user?->role ?? 'user');
-
-        if ($role === 'admin') {
-            return redirect()->route('admin.dashboard');
-        }
-
-        return redirect()->route('user.home');
     }
 
-    public function logout(Request $request)
-    {
-        Auth::logout();
+    $user = Auth::user();
+    $token = $user->createToken('auth-token')->plainTextToken;
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+    return response()->json([
+        'user' => $user,
+        'is_admin' => (string) ($user->role ?? 'user') === 'admin',
+        'token' => $token,
+    ]);
+}
 
-        return redirect()->route('login');
-    }
+    public function logout(Request $request): JsonResponse
+{
+    $request->user()->currentAccessToken()->delete();
+    return response()->json(['message' => 'Logout berhasil.']);
+}
 }

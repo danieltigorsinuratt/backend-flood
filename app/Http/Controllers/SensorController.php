@@ -6,6 +6,7 @@ use App\Events\SensorDataReceived;
 use App\Models\ActivityLog;
 use App\Models\Device;
 use App\Models\SensorData;
+use App\Services\WebSocketBroadcastService;
 use Illuminate\Http\Request;
 
 class SensorController extends Controller
@@ -42,7 +43,7 @@ class SensorController extends Controller
         return 'AWAS';
     }
 
-    public function ingest(Request $request)
+    public function ingest(Request $request, WebSocketBroadcastService $webSocketService)
     {
         $data = $request->validate([
             'device_id' => 'required|string|max:64',
@@ -108,6 +109,15 @@ class SensorController extends Controller
             'alert_level' => $alert,
             'relay_on' => $relayOn,
         ]));
+
+        // Trigger WebSocket broadcast for real-time updates
+        $webSocketService->broadcastSensorData([
+            'device_id' => $data['device_id'],
+            'water_level' => $water,
+            'alert_level' => $alert,
+            'relay_on' => $relayOn,
+            'timestamp' => now()->toIso8601String(),
+        ]);
 
         return response()->json([
             'message' => 'Data saved',

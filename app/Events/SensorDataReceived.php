@@ -17,21 +17,36 @@ class SensorDataReceived implements ShouldBroadcast
      */
     public function __construct(public array $payload) {}
 
-    public function broadcastOn(): Channel
+    /**
+     * Get the channels the event should broadcast on.
+     *
+     * @return array<int, \Illuminate\Broadcasting\Channel>
+     */
+    public function broadcastOn(): array
     {
-        return new Channel('sensor-channel');
+        return [
+            new Channel('sensor-channel'),
+        ];
     }
 
+    /**
+     * The event's broadcast name.
+     */
     public function broadcastAs(): string
     {
         return 'sensor.updated';
     }
 
     /**
+     * Get the data to broadcast.
+     *
      * @return array<string, mixed>
      */
     public function broadcastWith(): array
     {
-        return $this->payload;
+        return [
+            'data' => $this->payload,
+            'timestamp' => now()->toIso8601String(),
+        ];
     }
 }

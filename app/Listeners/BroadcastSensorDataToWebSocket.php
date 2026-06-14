@@ -3,17 +3,25 @@
 namespace App\Listeners;
 
 use App\Events\SensorDataReceived;
-use App\Services\WebSocketBroadcastService;
 
+/**
+ * Listener untuk sensor data events
+ * 
+ * Tidak perlu broadcast lagi karena SensorDataReceived event
+ * sudah implement ShouldBroadcast.
+ * Laravel Reverb akan handle broadcast otomatis.
+ */
 class BroadcastSensorDataToWebSocket
 {
-    public function __construct(private WebSocketBroadcastService $webSocketService) {}
-
     /**
      * Handle the event.
+     * 
+     * Listener ini optional jika ada logic tambahan yang diperlukan.
+     * Untuk sekarang biarkan kosong karena Reverb handle broadcast.
      */
     public function handle(SensorDataReceived $event): void
     {
-        $this->webSocketService->broadcastSensorData($event->payload);
+        // Reverb sudah handle broadcasting otomatis
+        // Logic tambahan bisa ditambahkan di sini jika diperlukan
     }
 }

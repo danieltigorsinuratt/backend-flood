@@ -2,74 +2,84 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
+use App\Events\SensorDataReceived;
 
+/**
+ * Service untuk trigger real-time broadcasts via Laravel Reverb
+ * 
+ * Reverb menangani WebSocket communication langsung.
+ * Service ini hanya helper untuk trigger events.
+ */
 class WebSocketBroadcastService
 {
-    private string $baseUrl;
-
-    public function __construct()
+    /**
+     * Broadcast sensor data update
+     */
+    public function broadcastSensorData(array $sensorData): void
     {
-        $this->baseUrl = env('WEBSOCKET_API_URL', 'http://localhost:6001');
+        SensorDataReceived::dispatch($sensorData);
     }
 
     /**
-     * Broadcast data ke WebSocket channel
-     *
-     * @param string $channel Nama channel
-     * @param array $data Data yang akan dikirim
-     * @return bool Success status
+     * Broadcast device status change
      */
-    public function broadcast(string $channel, array $data): bool
+    public function broadcastDeviceStatus(string $deviceId, string $status): void
     {
-        try {
-            $response = Http::timeout(5)->post("{$this->baseUrl}/api/broadcast", [
-                'channel' => $channel,
-                'data' => $data,
-            ]);
+        broadcast(new class($deviceId, $status) implements \Illuminate\Contracts\Broadcasting\ShouldBroadcast {
+            use \Illuminate\Broadcasting\InteractsWithSockets, \Illuminate\Queue\SerializesModels;
 
-            return $response->successful();
-        } catch (\Exception $e) {
-            \Log::warning("WebSocket broadcast failed: {$e->getMessage()}");
-            return false;
-        }
-    }
+            public function __construct(public string $deviceId, public string $status) {}
 
-    /**
-     * Broadcast sensor data ke channel
-     */
-    public function broadcastSensorData(array $sensorData): bool
-    {
-        return $this->broadcast('sensor-channel', [
-            'type' => 'sensor.updated',
-            'payload' => $sensorData,
-            'timestamp' => now()->toIso8601String(),
-        ]);
-    }
+            public function broadcastOn(): array
+            {
+                return [\Illuminate\Broadcasting\Channel::class => 'device-channel'];
+            }
 
-    /**
-     * Broadcast device status
-     */
-    public function broadcastDeviceStatus(string $deviceId, string $status): bool
-    {
-        return $this->broadcast('device-channel', [
-            'type' => 'device.status_changed',
-            'device_id' => $deviceId,
-            'status' => $status,
-            'timestamp' => now()->toIso8601String(),
-        ]);
+            public function broadcastAs(): string
+            {
+                return 'device.status_changed';
+            }
+
+            public function broadcastWith(): array
+            {
+                return [
+                    'device_id' => $this->deviceId,
+                    'status' => $this->status,
+                    'timestamp' => now()->toIso8601String(),
+                ];
+            }
+        })->toOthers();
     }
 
     /**
      * Broadcast command execution
      */
-    public function broadcastCommandExecution(string $deviceId, array $command): bool
+    public function broadcastCommandExecution(string $deviceId, array $command): void
     {
-        return $this->broadcast('command-channel', [
-            'type' => 'command.executed',
-            'device_id' => $deviceId,
-            'command' => $command,
-            'timestamp' => now()->toIso8601String(),
-        ]);
+        broadcast(new class($deviceId, $command) implements \Illuminate\Contracts\Broadcasting\ShouldBroadcast {
+            use \Illuminate\Broadcasting\InteractsWithSockets, \Illuminate\Queue\SerializesModels;
+
+            public function __construct(public string $deviceId, public array $command) {}
+
+            public function broadcastOn(): array
+            {
+                return [\Illuminate\Broadcasting\Channel::class => 'command-channel'];
+            }
+
+            public function broadcastAs(): string
+            {
+                return 'command.executed';
+            }
+
+            public function broadcastWith(): array
+            {
+                return [
+                    'device_id' => $this->deviceId,
+                    'command' => $this->command,
+                    'timestamp' => now()->toIso8601String(),
+                ];
+            }
+        })->toOthers();
     }
 }
+
